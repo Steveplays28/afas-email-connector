@@ -15,6 +15,7 @@ import email
 from email.header import decode_header
 from email.message import Message
 import imaplib
+import json
 import os
 from dotenv import load_dotenv
 import requests
@@ -34,16 +35,28 @@ SUBJECT_TYPE = 21
 FEATURE_TYPE = 127
 
 
-def send_updateconnector_post_request(From: str, subject: str, body: str):
+def send_updateconnector_post_request(date: str, From: str, subject: str, body: str):
     api_token_base64 = base64.b64encode(
         AFAS_UPDATECONNECTOR_API_TOKEN.encode("ascii")).decode("ascii")
 
-    headers = {"Authorization": f'AfasToken {api_token_base64}'}
-    data = '{ "KnSubject": { "Element": { "Fields": { "StId": 21, "Ds": "onderwerp", "SbTx": "toelichting", "Da": "2022-06-22T15:30:48", "FvF1": 127 }, "Objects": [ { "KnSubjectLink": { "Element": { "Fields": { "ToSR": true, "BcId": "999999" } } } } ] } } }'
+    input_file = open("default_post_payload.json", "r")
+    data = json.load(input_file)
+    input_file.close()
 
-    response = requests.post(AFAS_UPDATECONNECTOR_API_ENDPOINT, data,
-                             headers=headers)
-    print(response.status_code, response.text)
+    data['KnSubject.Element.Fields.Ds'] = subject
+
+    output_file = open("temp.json", "w")
+    json.dump(data, output_file)
+    output_file.close()
+
+    headers = {"Authorization": f'AfasToken {api_token_base64}'}
+
+    # response = requests.post(AFAS_UPDATECONNECTOR_API_ENDPOINT, data,
+    #                          headers=headers)
+    # print(response.status_code, response.text)
+    # os.remove("temp.json")
+
+    print(data)
 
 
 def message_to_body_text(message: Message):
@@ -76,8 +89,6 @@ def main():
     email_count = int(messages[0].decode("utf-8"))
 
     for i in range(email_count - 1, email_count - MESSAGE_FETCH_AMOUNT - 1, -1):
-        print(i)
-
         type, data = imap.fetch(str(2), "(RFC822)")
         raw_email = data[0][1]
         email_data: Message = email.message_from_bytes(raw_email)
@@ -96,7 +107,8 @@ def main():
             text = message_to_body_text(email_data)
             body = text
 
-        print(date, From, subject, body)
+        print(date, From, subject, body, sep="\n")
+        send_updateconnector_post_request(date, From, subject, body)
 
     imap.close()
     imap.logout()
