@@ -60,34 +60,39 @@ def main():
         print(response_data_string["subject"])
 
         if response_data_string.is_multipart():
+            j = 0
             for part in response_data_string.walk():
-                content_type = part.get_content_type()
-                content_disposition = str(
-                    part.get("Content-Disposition"))
+                if j < 1:
+                    print(base64.b64decode(part[part.len - 1]).decode("ascii"))
+                    
+                    i = 0
+                    for value in part:
+                        if i < 5:
+                            print(value)
+                            i = i + 1
+                    
+                    j = j + 1
 
-                body = part.get_payload()
-                print(body[0])
+                # if content_type == "text/plain" and "attachment" not in content_disposition:
+                #     # send_updateconnector_post_request(From, subject, body)
+                #     pass
+                # elif "attachment" in content_disposition:
+                #     filename = part.get_filename()
 
-                if content_type == "text/plain" and "attachment" not in content_disposition:
-                    # send_updateconnector_post_request(From, subject, body)
-                    pass
-                elif "attachment" in content_disposition:
-                    filename = part.get_filename()
+                #     if filename:
+                #         # TODO: Check if e-mail subject is a valid folder name
+                #         email_directory = os.path.join(
+                #             __location__, subject)
+                #         if os.path.isdir(email_directory) == False:
+                #             os.mkdir(email_directory)
 
-                    if filename:
-                        # TODO: Check if e-mail subject is a valid folder name
-                        email_directory = os.path.join(
-                            __location__, subject)
-                        if os.path.isdir(email_directory) == False:
-                            os.mkdir(email_directory)
+                #         filepath = os.path.join(
+                #             email_directory, filename)
 
-                        filepath = os.path.join(
-                            email_directory, filename)
+                #         open(filepath, "wb").write(
+                #             part.get_payload(decode=True))
 
-                        open(filepath, "wb").write(
-                            part.get_payload(decode=True))
-
-                        # TODO: Send POST API request to Afas UpdateConnector KnSubject
+                #         # TODO: Send POST API request to Afas UpdateConnector KnSubject
         else:
             content_type = response_data_string.get_content_type()
             body = response_data_string.get_payload(decode=True)
