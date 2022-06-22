@@ -12,12 +12,13 @@
 
 import base64
 import email
-import email.contentmanager
+from email.header import decode_header
 from email.message import Message
 import imaplib
 import os
 from dotenv import load_dotenv
 import requests
+import re
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -45,11 +46,26 @@ def send_updateconnector_post_request(From: str, subject: str, body: str):
     print(response.status_code, response.text)
 
 
-def get_text(msg: Message):
-    if msg.is_multipart():
-        return get_text(msg.get_payload(0))
-    else:
-        return msg.get_payload(None, True)
+def message_to_body_text(message: Message):
+    # Skip non-text part
+    if message.get_content_maintype() != "text":
+        return None
+
+    # Decode text
+    content_charset = message.get_content_charset()
+    text = bytes(message).decode(content_charset)
+
+    # Strip header
+    match: re.Match = re.search("<html>([\s\S]*?)<\/html>", text)
+
+    # HTML to text
+    # if message.get_content_subtype() == "html":
+    #     try:
+    #         text = html2text.html2text(text)
+    #     except:
+    #         print("Error occurred while converting HTML to text")
+
+    return match[0]
 
 
 def main():
@@ -59,33 +75,31 @@ def main():
     status, messages = imap.select("INBOX", True)
     email_count = int(messages[0].decode("utf-8"))
 
-    # for i in range(email_count - 1, email_count - MESSAGE_FETCH_AMOUNT - 1, -1):
-    #     print(i)
-
-    #     type, data = imap.fetch(str(i), "(RFC822)")
-    #     raw_email = data[0][1]
-
-    #     raw_email_string = raw_email.decode("utf-8")
-    #     email_message = email.message_from_string(raw_email_string)
-        
-    #     print(email_message)
-
     for i in range(email_count - 1, email_count - MESSAGE_FETCH_AMOUNT - 1, -1):
         print(i)
 
         type, data = imap.fetch(str(2), "(RFC822)")
         raw_email = data[0][1]
+        email_data: Message = email.message_from_bytes(raw_email)
 
-        raw_email_string = raw_email.decode("utf-8")
-        email_message = email.message_from_string(raw_email_string)
-        
-        print(get_text(email_message))
+        date = decode_header(email_data.get("Date"))[0][0]
+        From = decode_header(email_data.get("From"))[0][0]
+        subject = decode_header(email_data.get("Subject"))[0][0]
+
+        body = ""
+        if email_data.is_multipart():
+            for part in email_data.walk():
+                text = message_to_body_text(part)
+                if text is not None:
+                    body = body + text
+        else:
+            text = message_to_body_text(email_data)
+            body = text
+
+        print(date, From, subject, body)
 
     imap.close()
     imap.logout()
 
-
-# send_updateconnector_post_request(
-#     "djspaargaren@outlook.com", "Python test", "Test")
 
 main()
