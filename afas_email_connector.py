@@ -12,11 +12,10 @@
 
 import base64
 import email
-from email.header import decode_header
+import email.contentmanager
 from email.message import Message
 import imaplib
 import os
-import re
 from dotenv import load_dotenv
 import requests
 
@@ -46,6 +45,13 @@ def send_updateconnector_post_request(From: str, subject: str, body: str):
     print(response.status_code, response.text)
 
 
+def get_text(msg: Message):
+    if msg.is_multipart():
+        return get_text(msg.get_payload(0))
+    else:
+        return msg.get_payload(None, True)
+
+
 def main():
     imap = imaplib.IMAP4_SSL(IMAP_SERVER)
     imap.login(USERNAME, PASSWORD)
@@ -53,52 +59,27 @@ def main():
     status, messages = imap.select("INBOX", True)
     email_count = int(messages[0].decode("utf-8"))
 
+    # for i in range(email_count - 1, email_count - MESSAGE_FETCH_AMOUNT - 1, -1):
+    #     print(i)
+
+    #     type, data = imap.fetch(str(i), "(RFC822)")
+    #     raw_email = data[0][1]
+
+    #     raw_email_string = raw_email.decode("utf-8")
+    #     email_message = email.message_from_string(raw_email_string)
+        
+    #     print(email_message)
+
     for i in range(email_count - 1, email_count - MESSAGE_FETCH_AMOUNT - 1, -1):
         print(i)
 
-        part_type, part_data = imap.fetch(str(i), "(RFC822)")
-        part_data = email.message_from_bytes(part_data[0][1])
-        print(part_data["subject"])
+        type, data = imap.fetch(str(2), "(RFC822)")
+        raw_email = data[0][1]
 
-        body = ""
-        if part_data.is_multipart():
-            for subpart in part_data.walk():
-                body = body + \
-                    str(subpart.get_payload(decode=True)) + '\n'
-            body = bytes(body, 'utf-8').decode('unicode-escape')
-        else:
-            body = part_data.get_payload(decode=True)
+        raw_email_string = raw_email.decode("utf-8")
+        email_message = email.message_from_string(raw_email_string)
         
-        print(part_data.get_payload()[1].get_payload(decode=True))
-
-            # if content_type == "text/plain" and "attachment" not in content_disposition:
-            #     # send_updateconnector_post_request(From, subject, body)
-            #     pass
-            # elif "attachment" in content_disposition:
-            #     filename = part.get_filename()
-
-            #     if filename:
-            #         # TODO: Check if e-mail subject is a valid folder name
-            #         email_directory = os.path.join(
-            #             __location__, subject)
-            #         if os.path.isdir(email_directory) == False:
-            #             os.mkdir(email_directory)
-
-            #         filepath = os.path.join(
-            #             email_directory, filename)
-
-            #         open(filepath, "wb").write(
-            #             part.get_payload(decode=True))
-
-            #         # TODO: Send POST API request to Afas UpdateConnector KnSubject
-        # else:
-        #     content_type = response_data_string.get_content_type()
-        #     body = response_data_string.get_payload(decode=True)
-        #     print(body)
-
-        #     if content_type == "text/plain":
-        #         # send_updateconnector_post_request(From, subject, body)
-        #         pass
+        print(get_text(email_message))
 
     imap.close()
     imap.logout()
