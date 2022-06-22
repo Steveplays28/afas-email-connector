@@ -13,6 +13,7 @@
 import base64
 import email
 from email.header import decode_header
+from email.message import Message
 import imaplib
 import os
 import re
@@ -55,52 +56,49 @@ def main():
     for i in range(email_count - 1, email_count - MESSAGE_FETCH_AMOUNT - 1, -1):
         print(i)
 
-        response_type, response_data = imap.fetch(str(i), "(RFC822)")
-        response_data_string = email.message_from_bytes(response_data[0][1])
-        print(response_data_string["subject"])
+        part_type, part_data = imap.fetch(str(i), "(RFC822)")
+        part_data = email.message_from_bytes(part_data[0][1])
+        print(part_data["subject"])
 
-        if response_data_string.is_multipart():
-            j = 0
-            for part in response_data_string.walk():
-                if j < 1:
-                    print(base64.b64decode(part[part.len - 1]).decode("ascii"))
-                    
-                    i = 0
-                    for value in part:
-                        if i < 5:
-                            print(value)
-                            i = i + 1
-                    
-                    j = j + 1
-
-                # if content_type == "text/plain" and "attachment" not in content_disposition:
-                #     # send_updateconnector_post_request(From, subject, body)
-                #     pass
-                # elif "attachment" in content_disposition:
-                #     filename = part.get_filename()
-
-                #     if filename:
-                #         # TODO: Check if e-mail subject is a valid folder name
-                #         email_directory = os.path.join(
-                #             __location__, subject)
-                #         if os.path.isdir(email_directory) == False:
-                #             os.mkdir(email_directory)
-
-                #         filepath = os.path.join(
-                #             email_directory, filename)
-
-                #         open(filepath, "wb").write(
-                #             part.get_payload(decode=True))
-
-                #         # TODO: Send POST API request to Afas UpdateConnector KnSubject
+        body = ""
+        if part_data.is_multipart():
+            for subpart in part_data.walk():
+                body = body + \
+                    str(subpart.get_payload(decode=True)) + '\n'
+            body = bytes(body, 'utf-8').decode('unicode-escape')
         else:
-            content_type = response_data_string.get_content_type()
-            body = response_data_string.get_payload(decode=True)
-            print(body)
+            body = part_data.get_payload(decode=True)
+        
+        print(part_data.get_payload()[1].get_payload(decode=True))
 
-            if content_type == "text/plain":
-                # send_updateconnector_post_request(From, subject, body)
-                pass
+            # if content_type == "text/plain" and "attachment" not in content_disposition:
+            #     # send_updateconnector_post_request(From, subject, body)
+            #     pass
+            # elif "attachment" in content_disposition:
+            #     filename = part.get_filename()
+
+            #     if filename:
+            #         # TODO: Check if e-mail subject is a valid folder name
+            #         email_directory = os.path.join(
+            #             __location__, subject)
+            #         if os.path.isdir(email_directory) == False:
+            #             os.mkdir(email_directory)
+
+            #         filepath = os.path.join(
+            #             email_directory, filename)
+
+            #         open(filepath, "wb").write(
+            #             part.get_payload(decode=True))
+
+            #         # TODO: Send POST API request to Afas UpdateConnector KnSubject
+        # else:
+        #     content_type = response_data_string.get_content_type()
+        #     body = response_data_string.get_payload(decode=True)
+        #     print(body)
+
+        #     if content_type == "text/plain":
+        #         # send_updateconnector_post_request(From, subject, body)
+        #         pass
 
     imap.close()
     imap.logout()
