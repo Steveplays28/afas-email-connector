@@ -15,6 +15,7 @@ import email
 from email.header import decode_header
 import imaplib
 import os
+import re
 from dotenv import load_dotenv
 import requests
 
@@ -28,6 +29,8 @@ IMAP_SERVER = "outlook.office365.com"
 MESSAGE_FETCH_AMOUNT = 1
 AFAS_UPDATECONNECTOR_API_ENDPOINT = "https://76080.resttest.afas.online/ProfitRestServices/connectors/KnSubject"
 AFAS_UPDATECONNECTOR_API_TOKEN = os.getenv("AFAS_UPDATECONNECTOR_API_TOKEN")
+SUBJECT_TYPE = 21
+FEATURE_TYPE = 127
 
 
 def send_updateconnector_post_request(From: str, subject: str, body: str):
@@ -45,64 +48,60 @@ def send_updateconnector_post_request(From: str, subject: str, body: str):
 def main():
     imap = imaplib.IMAP4_SSL(IMAP_SERVER)
     imap.login(USERNAME, PASSWORD)
+
     status, messages = imap.select("INBOX", True)
+    email_count = int(messages[0].decode("utf-8"))
 
-    for i in range(messages, messages - MESSAGE_FETCH_AMOUNT, -1):
+    for i in range(email_count - 1, email_count - MESSAGE_FETCH_AMOUNT - 1, -1):
+        print(i)
+
         response_type, response_data = imap.fetch(str(i), "(RFC822)")
+        response_data_string = email.message_from_bytes(response_data[0][1])
+        print(response_data_string["subject"])
 
-        for response in response_data:
-            message = email.message_from_bytes(response[1])
+        if response_data_string.is_multipart():
+            for part in response_data_string.walk():
+                content_type = part.get_content_type()
+                content_disposition = str(
+                    part.get("Content-Disposition"))
 
-            From, encoding = decode_header(message.get("From"))[0]
-            if isinstance(From, bytes):
-                From = From.decode(encoding)
+                body = part.get_payload()
+                print(body[0])
 
-            subject, encoding = decode_header(message["Subject"])[0]
-            if isinstance(subject, bytes):
-                subject = subject.decode(encoding)
+                if content_type == "text/plain" and "attachment" not in content_disposition:
+                    # send_updateconnector_post_request(From, subject, body)
+                    pass
+                elif "attachment" in content_disposition:
+                    filename = part.get_filename()
 
-            if message.is_multipart():
-                for part in message.walk():
-                    content_type = part.get_content_type()
-                    content_disposition = str(
-                        part.get("Content-Disposition"))
+                    if filename:
+                        # TODO: Check if e-mail subject is a valid folder name
+                        email_directory = os.path.join(
+                            __location__, subject)
+                        if os.path.isdir(email_directory) == False:
+                            os.mkdir(email_directory)
 
-                    try:
-                        body = part.get_payload(decode=True).decode()
-                    except:
-                        pass
+                        filepath = os.path.join(
+                            email_directory, filename)
 
-                    if content_type == "text/plain" and "attachment" not in content_disposition:
+                        open(filepath, "wb").write(
+                            part.get_payload(decode=True))
+
                         # TODO: Send POST API request to Afas UpdateConnector KnSubject
-                        send_updateconnector_post_request(From, subject, body)
-                        print(body)
-                    elif "attachment" in content_disposition:
-                        filename = part.get_filename()
+        else:
+            content_type = response_data_string.get_content_type()
+            body = response_data_string.get_payload(decode=True)
+            print(body)
 
-                        if filename:
-                            # TODO: Check if e-mail subject is a valid folder name
-                            email_directory = os.path.join(
-                                __location__, subject)
-                            if os.path.isdir(email_directory) == False:
-                                os.mkdir(email_directory)
+            if content_type == "text/plain":
+                # send_updateconnector_post_request(From, subject, body)
+                pass
 
-                            filepath = os.path.join(
-                                email_directory, filename)
-
-                            open(filepath, "wb").write(
-                                part.get_payload(decode=True))
-
-                            # TODO: Send POST API request to Afas UpdateConnector KnSubject
-
-            else:
-                content_type = message.get_content_type()
-                body = message.get_payload(decode=True).decode()
-
-                if content_type == "text/plain":
-                    # TODO: Send POST API request to Afas UpdateConnector KnSubject
-                    send_updateconnector_post_request(From, subject, body)
-                    print(body)
+    imap.close()
+    imap.logout()
 
 
-send_updateconnector_post_request(
-    "djspaargaren@outlook.com", "Python test", "Test")
+# send_updateconnector_post_request(
+#     "djspaargaren@outlook.com", "Python test", "Test")
+
+main()
