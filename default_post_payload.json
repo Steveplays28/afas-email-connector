@@ -3,8 +3,9 @@
 		"Element": {
 			"Fields": {
 				"StId": 21,
+				"UsId": "address@domain",
 				"Ds": "onderwerp",
-				"SbTx": "toelichting",
+				"SbTx": "body",
 				"Da": "2022-06-22T15:30:48",
 				"FvF1": 127
 			},
