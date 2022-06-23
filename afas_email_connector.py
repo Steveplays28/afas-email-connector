@@ -21,6 +21,8 @@ from dotenv import load_dotenv
 import requests
 import re
 from datetime import datetime
+import sys
+
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -28,15 +30,18 @@ load_dotenv(os.path.join(__location__, ".env"))
 
 USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
-IMAP_SERVER = "outlook.office365.com"
-MESSAGE_FETCH_AMOUNT = 1
-AFAS_UPDATECONNECTOR_API_ENDPOINT = "https://76080.resttest.afas.online/ProfitRestServices/connectors/KnSubject"
+IMAP_SERVER: str = "outlook.office365.com"
+MESSAGE_FETCH_AMOUNT: int = 1
+AFAS_UPDATECONNECTOR_API_ENDPOINT: str = "https://76080.resttest.afas.online/ProfitRestServices/connectors/KnSubject"
 AFAS_UPDATECONNECTOR_API_TOKEN = os.getenv("AFAS_UPDATECONNECTOR_API_TOKEN")
-SUBJECT_TYPE = 21
-FEATURE_TYPE = 127
+SUBJECT_TYPE: int = 21
+FEATURE_TYPE: int = 127
+PROCESSED_MESSAGES_FOLDER: str = "PROCESSED"
+
+is_debug = sys.argv.__contains__("-debug")
 
 
-def send_updateconnector_post_request(date: str, From: str, subject: str, body: str):
+def send_updateconnector_post_request(date: str, From: str, subject: str, body: str, files: list(tuple[str, bytes])):
     # Convert Afas UpdateConnector API token to base64
     api_token_base64 = base64.b64encode(
         AFAS_UPDATECONNECTOR_API_TOKEN.encode("ascii")).decode("ascii")
@@ -56,17 +61,31 @@ def send_updateconnector_post_request(date: str, From: str, subject: str, body: 
     data["KnSubject"]["Element"]["Fields"]["Da"] = date_formatted
     data["KnSubject"]["Element"]["Fields"]["UsId"] = From
     data["KnSubject"]["Element"]["Fields"]["Ds"] = subject
-    data["KnSubject"]["Element"]["Fields"]["Ds"] = subject
+    data["KnSubject"]["Element"]["Fields"]["SbTx"] = body
+
+    # Load default file attachment JSON
+    attachment_file = open("attachment.json", "r")
+    attachment_json = json.load(input_file)
+    attachment_file.close()
+
+    # Change JSON property values
+    attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileName"] = file_name
+    attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileStream"] = file_stream
+
+    # Add file attachment JSON to main JSON data
+    length = len(data["KnSubject"]["Element"]["Objects"])
+    data["KnSubject"]["Element"]["Objects"][length] = attachment_json
 
     # Format JSON
     data_formatted: str = json.dumps(data)
 
-    # Send JSON via POST request
-    # response = requests.post(AFAS_UPDATECONNECTOR_API_ENDPOINT, data_formatted,
-    #                          headers=headers)
-
-    # print(data_formatted)
-    # print(response.status_code, response.text)
+    if is_debug == False:
+        # Send JSON via POST request
+        response = requests.post(AFAS_UPDATECONNECTOR_API_ENDPOINT, data_formatted,
+                                 headers=headers)
+    else:
+        print(data_formatted)
+        print(response.status_code, response.text)
 
 
 def message_to_body_text(message: Message) -> str:
@@ -122,6 +141,11 @@ def main():
     status, messages = imap.select("INBOX", True)
     email_count = int(messages[0].decode("utf-8"))
 
+    # Check status of select
+    if status != "OK":
+        print("Error while selecting inbox folder, returned: " + status)
+        return
+
     # Loop through N newest emails
     for i in range(email_count - 1, email_count - MESSAGE_FETCH_AMOUNT - 1, -1):
         type, data = imap.fetch(str(2), "(RFC822)")
@@ -134,18 +158,15 @@ def main():
         subject = decode_header(email_data.get("Subject"))[0][0]
 
         # Get body from e-mail
-        body = ""
-        if email_data.is_multipart():
-            for part in email_data.walk():
-                text = message_to_body_text(part)
-                if text is not None:
-                    body = body + text
-        else:
-            text = message_to_body_text(email_data)
-            body = text
+        body = process_multipart_message(email_data)
 
         # Send UpdateConnector POST request
         send_updateconnector_post_request(date, From, subject, body)
+
+        # Move e-mails to PROCESSED_MESSAGES_FOLDER
+        if is_debug == False:
+            imap.uid("MOVE", email_data.get("Message-ID"),
+                     PROCESSED_MESSAGES_FOLDER)
 
     # Close inbox folder and log out
     imap.close()

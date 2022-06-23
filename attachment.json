@@ -1,0 +1,10 @@
+{
+	"KnSubjectAttachment": {
+		"Element": {
+			"Fields": {
+				"FileName": "file_name",
+				"FileStream": "byte_array"
+			}
+		}
+	}
+}

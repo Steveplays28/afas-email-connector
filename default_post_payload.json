@@ -4,7 +4,7 @@
 			"Fields": {
 				"StId": 21,
 				"UsId": "address@domain",
-				"Ds": "onderwerp",
+				"Ds": "subject",
 				"SbTx": "body",
 				"Da": "2022-06-22T15:30:48",
 				"FvF1": 127
