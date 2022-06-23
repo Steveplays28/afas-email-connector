@@ -68,13 +68,19 @@ def send_updateconnector_post_request(date: str, From: str, subject: str, body: 
     attachment_json = json.load(input_file)
     attachment_file.close()
 
-    # Change JSON property values
-    attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileName"] = file_name
-    attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileStream"] = file_stream
+    # Iterate over files
+    i: int = 0
+    for file in files:
+        # Change JSON property values
+        attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileName"] = files[i][0]
+        attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileStream"] = files[i][1]
 
-    # Add file attachment JSON to main JSON data
-    length = len(data["KnSubject"]["Element"]["Objects"])
-    data["KnSubject"]["Element"]["Objects"][length] = attachment_json
+        # Add file attachment JSON to main JSON data
+        length = len(data["KnSubject"]["Element"]["Objects"])
+        data["KnSubject"]["Element"]["Objects"][length] = attachment_json
+
+        # Increment counter
+        i = i + 1
 
     # Format JSON
     data_formatted: str = json.dumps(data)
