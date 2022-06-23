@@ -41,7 +41,7 @@ PROCESSED_MESSAGES_FOLDER: str = "PROCESSED"
 is_debug = sys.argv.__contains__("-debug")
 
 
-def send_updateconnector_post_request(date: str, From: str, subject: str, body: str, files: list(tuple[str, bytes])):
+def send_updateconnector_post_request(date: str, From: str, subject: str, body: str, files: list((str, bytes))):
     # Convert Afas UpdateConnector API token to base64
     api_token_base64 = base64.b64encode(
         AFAS_UPDATECONNECTOR_API_TOKEN.encode("ascii")).decode("ascii")
@@ -63,24 +63,22 @@ def send_updateconnector_post_request(date: str, From: str, subject: str, body: 
     data["KnSubject"]["Element"]["Fields"]["Ds"] = subject
     data["KnSubject"]["Element"]["Fields"]["SbTx"] = body
 
-    # Load default file attachment JSON
-    attachment_file = open("attachment.json", "r")
-    attachment_json = json.load(input_file)
-    attachment_file.close()
+    if len(files) > 0:
+        # Load default file attachment JSON
+        attachment_file = open("attachment.json", "r")
+        attachment_json = json.load(attachment_file)
+        attachment_file.close()
 
-    # Iterate over files
-    i: int = 0
-    for file in files:
-        # Change JSON property values
-        attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileName"] = files[i][0]
-        attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileStream"] = files[i][1]
+        # Iterate over files
+        for file in files:
+            print(file[0])
+            # Change JSON property values
+            attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileName"] = file[0]
+            attachment_json["KnSubjectAttachment"]["Element"]["Fields"]["FileStream"] = file[1]
 
-        # Add file attachment JSON to main JSON data
-        length = len(data["KnSubject"]["Element"]["Objects"])
-        data["KnSubject"]["Element"]["Objects"][length] = attachment_json
-
-        # Increment counter
-        i = i + 1
+            # Add file attachment JSON to main JSON data
+            length = len(data["KnSubject"]["Element"]["Objects"])
+            data["KnSubject"]["Element"]["Objects"][length] = attachment_json
 
     # Format JSON
     data_formatted: str = json.dumps(data)
@@ -116,15 +114,28 @@ def message_to_body_text(message: Message) -> str:
     return match[0]
 
 
-def process_multipart_message(message: Message) -> str:
+def process_multipart_message(message: Message) -> tuple(str, list((str, bytes))):
     body = ""
+    files = list((str, bytes))
+
     if message.is_multipart():
+        i: int = 0
         for part in message.walk():
-            body = body + process_multipart_message(part)
+            if part.get_content_maintype("text"):
+                body = body + process_multipart_message(part)
+            else:
+                if part.get('Content-Disposition') is None:
+                    continue
+
+                files[i][0] = part.get_filename()
+                files[i][1] = part.get_payload(decode=True)
+
+                process_multipart_message(part)
+                i = i + 1
     else:
         body = body + message_to_body_text(message)
 
-    return body
+    return (body, files)
 
 
 def parse_date(date: str) -> datetime:
@@ -164,10 +175,10 @@ def main():
         subject = decode_header(email_data.get("Subject"))[0][0]
 
         # Get body from e-mail
-        body = process_multipart_message(email_data)
+        body, files = process_multipart_message(email_data)
 
         # Send UpdateConnector POST request
-        send_updateconnector_post_request(date, From, subject, body)
+        send_updateconnector_post_request(date, From, subject, body, files)
 
         # Move e-mails to PROCESSED_MESSAGES_FOLDER
         if is_debug == False:
