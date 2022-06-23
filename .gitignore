@@ -171,3 +171,6 @@ cython_debug/
 
 # Built Visual Studio Code Extensions
 *.vsix
+/.vs/afas-email-connector/FileContentIndex
+/.vs/afas-email-connector/v17/.suo
+/.vs

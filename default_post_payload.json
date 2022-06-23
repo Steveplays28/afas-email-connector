@@ -3,7 +3,6 @@
 		"Element": {
 			"Fields": {
 				"StId": 21,
-				"UsId": "address@domain",
 				"Ds": "subject",
 				"SbTx": "body",
 				"Da": "2022-06-22T15:30:48",
