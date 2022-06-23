@@ -25,10 +25,11 @@ from datetime import datetime
 import sys
 
 
-__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+__location__ = os.path.realpath(os.path.join(
+    os.getcwd(), os.path.dirname(__file__)))
 load_dotenv(os.path.join(__location__, ".env"))
 
-USERNAME = "python@strongoutsourcing.com"
+USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 IMAP_SERVER: str = "outlook.office365.com"
 MESSAGE_FETCH_AMOUNT: int = 1
@@ -68,15 +69,14 @@ def send_updateconnector_post_request(
     data["KnSubject"]["Element"]["Fields"]["Ds"] = subject
     data["KnSubject"]["Element"]["Fields"]["SbTx"] = body
 
-    if len(files) > 2:  # str and list are always there
+    if len(files) > 2:
         # Load default file attachment JSON
         attachment_file = open("attachment.json", "r")
         attachment_json = json.load(attachment_file)
         attachment_file.close()
 
-        x = -1
-
         # Iterate over files
+        x = -1
         for file in files:
             x = x + 1
 
@@ -98,7 +98,7 @@ def send_updateconnector_post_request(
             ] = file[0]
             attachment_json["KnSubjectAttachment"]["Element"]["Fields"][
                 "FileStream"
-            ] = fileContentEncoded 
+            ] = fileContentEncoded
 
             # Add file attachment JSON to main JSON data
             data["KnSubject"]["Element"]["Objects"].append(attachment_json)
@@ -115,7 +115,6 @@ def send_updateconnector_post_request(
             print(response.text)
     else:
         print(data_formatted)
-        print(response.status_code, response.text)
 
 
 def message_to_body_text(message: Message) -> str:
@@ -152,7 +151,8 @@ def process_multipart_message(message: Message) -> tuple[str, list((str, bytes))
                 if part.get("Content-Disposition") is None:
                     continue
 
-                fileTuple = (part.get_filename(), part.get_payload(decode=True))
+                fileTuple = (part.get_filename(),
+                             part.get_payload(decode=True))
                 files.append(fileTuple)
 
                 process_multipart_message(part)
@@ -169,7 +169,8 @@ def process_multipart_message(message: Message) -> tuple[str, list((str, bytes))
 def parse_date(date: str) -> datetime:
     # Format date to iso format (timezone gets stripped)
     # "Mon, 20 Jun 2022 10:43:17 +0200" ----> "2022-06-20T10:43:17"
-    date_formatted: datetime = datetime.strptime(date, "%a, %d %b %Y %H:%M:%S %z")
+    date_formatted: datetime = datetime.strptime(
+        date, "%a, %d %b %Y %H:%M:%S %z")
     date_formatted = datetime.replace(date_formatted, tzinfo=None)
     date_formatted = date_formatted.isoformat()
 
